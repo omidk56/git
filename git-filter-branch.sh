@@ -83,6 +83,19 @@ set_ident () {
 	finish_ident COMMITTER
 }
 
+if [ -z "$FILTER_BRANCH_SQUELCH_WARNING" -a \
+     -z "$GIT_TEST_DISALLOW_ABBREVIATED_OPTIONS" ]; then
+	cat <<EOF
+WARNING: git-filter-branch has a glut of gotchas generating mangled history
+	 rewrites.  Please use an alternative filtering tool such as 'git
+	 filter-repo' (https://github.com/newren/git-filter-repo/) instead.
+	 See the filter-branch manual page for more details; to squelch
+	 this warning, set FILTER_BRANCH_SQUELCH_WARNING=1.
+
+EOF
+	sleep 5
+fi
+
 USAGE="[--setup <command>] [--subdirectory-filter <directory>] [--env-filter <command>]
 	[--tree-filter <command>] [--index-filter <command>]
 	[--parent-filter <command>] [--msg-filter <command>]
