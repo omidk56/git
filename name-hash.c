@@ -33,9 +33,9 @@ static struct dir_entry *find_dir_entry__hash(struct index_state *istate,
 		const char *name, unsigned int namelen, unsigned int hash)
 {
 	struct dir_entry key;
-	hashmap_entry_init(&key, hash);
+	hashmap_entry_init(&key.ent, hash);
 	key.namelen = namelen;
-	return hashmap_get(&istate->dir_hash, &key, name);
+	return hashmap_get(&istate->dir_hash, &key.ent, name);
 }
 
 static struct dir_entry *find_dir_entry(struct index_state *istate,
@@ -68,9 +68,9 @@ static struct dir_entry *hash_dir_entry(struct index_state *istate,
 	if (!dir) {
 		/* not found, create it and add to hash table */
 		FLEX_ALLOC_MEM(dir, name, ce->name, namelen);
-		hashmap_entry_init(dir, memihash(ce->name, namelen));
+		hashmap_entry_init(&dir->ent, memihash(ce->name, namelen));
 		dir->namelen = namelen;
-		hashmap_add(&istate->dir_hash, dir);
+		hashmap_add(&istate->dir_hash, &dir->ent);
 
 		/* recursively add missing parent directories */
 		dir->parent = hash_dir_entry(istate, ce, namelen);
@@ -95,7 +95,7 @@ static void remove_dir_entry(struct index_state *istate, struct cache_entry *ce)
 	struct dir_entry *dir = hash_dir_entry(istate, ce, ce_namelen(ce));
 	while (dir && !(--dir->nr)) {
 		struct dir_entry *parent = dir->parent;
-		hashmap_remove(&istate->dir_hash, dir, NULL);
+		hashmap_remove(&istate->dir_hash, &dir->ent, NULL);
 		free(dir);
 		dir = parent;
 	}
@@ -106,8 +106,8 @@ static void hash_index_entry(struct index_state *istate, struct cache_entry *ce)
 	if (ce->ce_flags & CE_HASHED)
 		return;
 	ce->ce_flags |= CE_HASHED;
-	hashmap_entry_init(ce, memihash(ce->name, ce_namelen(ce)));
-	hashmap_add(&istate->name_hash, ce);
+	hashmap_entry_init(&ce->ent, memihash(ce->name, ce_namelen(ce)));
+	hashmap_add(&istate->name_hash, &ce->ent);
 
 	if (ignore_case)
 		add_dir_entry(istate, ce);
@@ -268,7 +268,7 @@ static struct dir_entry *hash_dir_entry_with_parent_and_prefix(
 	assert((parent != NULL) ^ (strchr(prefix->buf, '/') == NULL));
 
 	if (parent)
-		hash = memihash_cont(parent->ent.hash,
+		hash = memihash_cont(parent->ent._hash,
 			prefix->buf + parent->namelen,
 			prefix->len - parent->namelen);
 	else
@@ -280,16 +280,17 @@ static struct dir_entry *hash_dir_entry_with_parent_and_prefix(
 	dir = find_dir_entry__hash(istate, prefix->buf, prefix->len, hash);
 	if (!dir) {
 		FLEX_ALLOC_MEM(dir, name, prefix->buf, prefix->len);
-		hashmap_entry_init(dir, hash);
+		hashmap_entry_init(&dir->ent, hash);
 		dir->namelen = prefix->len;
 		dir->parent = parent;
-		hashmap_add(&istate->dir_hash, dir);
+		hashmap_add(&istate->dir_hash, &dir->ent);
 
 		if (parent) {
 			unlock_dir_mutex(lock_nr);
 
 			/* All I really need here is an InterlockedIncrement(&(parent->nr)) */
-			lock_nr = compute_dir_lock_nr(&istate->dir_hash, parent->ent.hash);
+			lock_nr = compute_dir_lock_nr(&istate->dir_hash,
+							parent->ent._hash);
 			lock_dir_mutex(lock_nr);
 			parent->nr++;
 		}
@@ -427,10 +428,10 @@ static int handle_range_1(
 		lazy_entries[k].dir = parent;
 		if (parent) {
 			lazy_entries[k].hash_name = memihash_cont(
-				parent->ent.hash,
+				parent->ent._hash,
 				ce_k->name + parent->namelen,
 				ce_namelen(ce_k) - parent->namelen);
-			lazy_entries[k].hash_dir = parent->ent.hash;
+			lazy_entries[k].hash_dir = parent->ent._hash;
 		} else {
 			lazy_entries[k].hash_name = memihash(ce_k->name, ce_namelen(ce_k));
 		}
@@ -472,8 +473,8 @@ static void *lazy_name_thread_proc(void *_data)
 	for (k = 0; k < d->istate->cache_nr; k++) {
 		struct cache_entry *ce_k = d->istate->cache[k];
 		ce_k->ce_flags |= CE_HASHED;
-		hashmap_entry_init(ce_k, d->lazy_entries[k].hash_name);
-		hashmap_add(&d->istate->name_hash, ce_k);
+		hashmap_entry_init(&ce_k->ent, d->lazy_entries[k].hash_name);
+		hashmap_add(&d->istate->name_hash, &ce_k->ent);
 	}
 
 	return NULL;
@@ -625,7 +626,7 @@ void remove_name_hash(struct index_state *istate, struct cache_entry *ce)
 	if (!istate->name_hash_initialized || !(ce->ce_flags & CE_HASHED))
 		return;
 	ce->ce_flags &= ~CE_HASHED;
-	hashmap_remove(&istate->name_hash, ce, ce);
+	hashmap_remove(&istate->name_hash, &ce->ent, ce);
 
 	if (ignore_case)
 		remove_dir_entry(istate, ce);
@@ -702,15 +703,17 @@ void adjust_dirname_case(struct index_state *istate, char *name)
 struct cache_entry *index_file_exists(struct index_state *istate, const char *name, int namelen, int icase)
 {
 	struct cache_entry *ce;
+	struct hashmap_entry *ent;
 
 	lazy_init_name_hash(istate);
 
-	ce = hashmap_get_from_hash(&istate->name_hash,
+	ent = hashmap_get_from_hash(&istate->name_hash,
 				   memihash(name, namelen), NULL);
-	while (ce) {
+	while (ent) {
+		ce = container_of(ent, struct cache_entry, ent);
 		if (same_name(ce, name, namelen, icase))
 			return ce;
-		ce = hashmap_get_next(&istate->name_hash, ce);
+		ent = hashmap_get_next(&istate->name_hash, ent);
 	}
 	return NULL;
 }

@@ -123,9 +123,9 @@ static void cache_put_path(struct submodule_cache *cache,
 	unsigned int hash = hash_oid_string(&submodule->gitmodules_oid,
 					    submodule->path);
 	struct submodule_entry *e = xmalloc(sizeof(*e));
-	hashmap_entry_init(e, hash);
+	hashmap_entry_init(&e->ent, hash);
 	e->config = submodule;
-	hashmap_put(&cache->for_path, e);
+	hashmap_put(&cache->for_path, &e->ent);
 }
 
 static void cache_remove_path(struct submodule_cache *cache,
@@ -135,9 +135,9 @@ static void cache_remove_path(struct submodule_cache *cache,
 					    submodule->path);
 	struct submodule_entry e;
 	struct submodule_entry *removed;
-	hashmap_entry_init(&e, hash);
+	hashmap_entry_init(&e.ent, hash);
 	e.config = submodule;
-	removed = hashmap_remove(&cache->for_path, &e, NULL);
+	removed = hashmap_remove(&cache->for_path, &e.ent, NULL);
 	free(removed);
 }
 
@@ -147,9 +147,9 @@ static void cache_add(struct submodule_cache *cache,
 	unsigned int hash = hash_oid_string(&submodule->gitmodules_oid,
 					    submodule->name);
 	struct submodule_entry *e = xmalloc(sizeof(*e));
-	hashmap_entry_init(e, hash);
+	hashmap_entry_init(&e->ent, hash);
 	e->config = submodule;
-	hashmap_add(&cache->for_name, e);
+	hashmap_add(&cache->for_name, &e->ent);
 }
 
 static const struct submodule *cache_lookup_path(struct submodule_cache *cache,
@@ -163,10 +163,10 @@ static const struct submodule *cache_lookup_path(struct submodule_cache *cache,
 	oidcpy(&key_config.gitmodules_oid, gitmodules_oid);
 	key_config.path = path;
 
-	hashmap_entry_init(&key, hash);
+	hashmap_entry_init(&key.ent, hash);
 	key.config = &key_config;
 
-	entry = hashmap_get(&cache->for_path, &key, NULL);
+	entry = hashmap_get(&cache->for_path, &key.ent, NULL);
 	if (entry)
 		return entry->config;
 	return NULL;
@@ -183,10 +183,10 @@ static struct submodule *cache_lookup_name(struct submodule_cache *cache,
 	oidcpy(&key_config.gitmodules_oid, gitmodules_oid);
 	key_config.name = name;
 
-	hashmap_entry_init(&key, hash);
+	hashmap_entry_init(&key.ent, hash);
 	key.config = &key_config;
 
-	entry = hashmap_get(&cache->for_name, &key, NULL);
+	entry = hashmap_get(&cache->for_name, &key.ent, NULL);
 	if (entry)
 		return entry->config;
 	return NULL;

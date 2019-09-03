@@ -1796,7 +1796,7 @@ static struct ref_store_hash_entry *alloc_ref_store_hash_entry(
 	struct ref_store_hash_entry *entry;
 
 	FLEX_ALLOC_STR(entry, name, name);
-	hashmap_entry_init(entry, strhash(name));
+	hashmap_entry_init(&entry->ent, strhash(name));
 	entry->refs = refs;
 	return entry;
 }
@@ -1863,10 +1863,13 @@ static void register_ref_store_map(struct hashmap *map,
 				   struct ref_store *refs,
 				   const char *name)
 {
+	struct ref_store_hash_entry *entry;
+
 	if (!map->tablesize)
 		hashmap_init(map, ref_store_hash_cmp, NULL, 0);
 
-	if (hashmap_put(map, alloc_ref_store_hash_entry(name, refs)))
+	entry = alloc_ref_store_hash_entry(name, refs);
+	if (hashmap_put(map, &entry->ent))
 		BUG("%s ref_store '%s' initialized twice", type, name);
 }
 

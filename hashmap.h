@@ -48,43 +48,49 @@
  *         if (!strcmp("add", action)) {
  *             struct long2string *e;
  *             FLEX_ALLOC_STR(e, value, value);
- *             hashmap_entry_init(e, memhash(&key, sizeof(long)));
+ *             hashmap_entry_init(&e->ent, memhash(&key, sizeof(long)));
  *             e->key = key;
- *             hashmap_add(&map, e);
+ *             hashmap_add(&map, &e->ent);
  *         }
  *
  *         if (!strcmp("print_all_by_key", action)) {
  *             struct long2string k, *e;
- *             hashmap_entry_init(&k, memhash(&key, sizeof(long)));
+ *             struct hashmap_entry *ent;
+ *             hashmap_entry_init(&k->ent, memhash(&key, sizeof(long)));
  *             k.key = key;
  *
  *             flags &= ~COMPARE_VALUE;
- *             e = hashmap_get(&map, &k, NULL);
- *             if (e) {
+ *             ent = hashmap_get(&map, &k, NULL);
+ *             if (ent) {
+ *                 e = container_of(ent, struct long2string, ent);
  *                 printf("first: %ld %s\n", e->key, e->value);
- *                 while ((e = hashmap_get_next(&map, e)))
+ *                 while ((ent = hashmap_get_next(&map, ent))) {
+ *                     e = container_of(ent, struct long2string, ent);
  *                     printf("found more: %ld %s\n", e->key, e->value);
+ *                 }
  *             }
  *         }
  *
  *         if (!strcmp("has_exact_match", action)) {
  *             struct long2string *e;
  *             FLEX_ALLOC_STR(e, value, value);
- *             hashmap_entry_init(e, memhash(&key, sizeof(long)));
+ *             hashmap_entry_init(&e->ent, memhash(&key, sizeof(long)));
  *             e->key = key;
  *
  *             flags |= COMPARE_VALUE;
- *             printf("%sfound\n", hashmap_get(&map, e, NULL) ? "" : "not ");
+ *             printf("%sfound\n",
+ *                    hashmap_get(&map, &e->ent, NULL) ? "" : "not ");
  *             free(e);
  *         }
  *
  *         if (!strcmp("has_exact_match_no_heap_alloc", action)) {
  *             struct long2string k;
- *             hashmap_entry_init(&k, memhash(&key, sizeof(long)));
+ *             hashmap_entry_init(&k->ent, memhash(&key, sizeof(long)));
  *             k.key = key;
  *
  *             flags |= COMPARE_VALUE;
- *             printf("%sfound\n", hashmap_get(&map, &k, value) ? "" : "not ");
+ *             printf("%sfound\n",
+ *                    hashmap_get(&map, &k->ent, value) ? "" : "not ");
  *         }
  *
  *         if (!strcmp("end", action)) {
@@ -145,7 +151,7 @@ struct hashmap_entry {
 	struct hashmap_entry *next;
 
 	/* entry's hash code */
-	unsigned int hash;
+	unsigned int _hash;
 };
 
 /*
@@ -244,10 +250,10 @@ void hashmap_free(struct hashmap *map, int free_entries);
  * your structure was allocated with xmalloc(), you can just free(3) it,
  * and if it is on stack, you can just let it go out of scope).
  */
-static inline void hashmap_entry_init(void *entry, unsigned int hash)
+static inline void
+hashmap_entry_init(struct hashmap_entry *e, unsigned int hash)
 {
-	struct hashmap_entry *e = entry;
-	e->hash = hash;
+	e->_hash = hash;
 	e->next = NULL;
 }
 
@@ -286,7 +292,7 @@ static inline unsigned int hashmap_get_size(struct hashmap *map)
  * If an entry with matching hash code is found, `key` and `keydata` are passed
  * to `hashmap_cmp_fn` to decide whether the entry matches the key.
  */
-void *hashmap_get(const struct hashmap *map, const void *key,
+void *hashmap_get(const struct hashmap *map, const struct hashmap_entry *key,
 			 const void *keydata);
 
 /*
@@ -318,7 +324,8 @@ static inline void *hashmap_get_from_hash(const struct hashmap *map,
  * `entry` is the hashmap_entry to start the search from, obtained via a previous
  * call to `hashmap_get` or `hashmap_get_next`.
  */
-void *hashmap_get_next(const struct hashmap *map, const void *entry);
+struct hashmap_entry *hashmap_get_next(const struct hashmap *map,
+			const struct hashmap_entry *entry);
 
 /*
  * Adds a hashmap entry. This allows to add duplicate entries (i.e.
@@ -327,7 +334,7 @@ void *hashmap_get_next(const struct hashmap *map, const void *entry);
  * `map` is the hashmap structure.
  * `entry` is the entry to add.
  */
-void hashmap_add(struct hashmap *map, void *entry);
+void hashmap_add(struct hashmap *map, struct hashmap_entry *entry);
 
 /*
  * Adds or replaces a hashmap entry. If the hashmap contains duplicate
@@ -337,7 +344,7 @@ void hashmap_add(struct hashmap *map, void *entry);
  * `entry` is the entry to add or replace.
  * Returns the replaced entry, or NULL if not found (i.e. the entry was added).
  */
-void *hashmap_put(struct hashmap *map, void *entry);
+void *hashmap_put(struct hashmap *map, struct hashmap_entry *entry);
 
 /*
  * Removes a hashmap entry matching the specified key. If the hashmap contains
@@ -346,7 +353,7 @@ void *hashmap_put(struct hashmap *map, void *entry);
  *
  * Argument explanation is the same as in `hashmap_get`.
  */
-void *hashmap_remove(struct hashmap *map, const void *key,
+void *hashmap_remove(struct hashmap *map, const struct hashmap_entry *key,
 		const void *keydata);
 
 /*

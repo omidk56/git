@@ -142,18 +142,19 @@ static void paths_and_oids_insert(struct hashmap *map,
 	struct path_and_oids_entry key;
 	struct path_and_oids_entry *entry;
 
-	hashmap_entry_init(&key, hash);
+	hashmap_entry_init(&key.ent, hash);
 
 	/* use a shallow copy for the lookup */
 	key.path = (char *)path;
 	oidset_init(&key.trees, 0);
 
-	if (!(entry = (struct path_and_oids_entry *)hashmap_get(map, &key, NULL))) {
+	entry = hashmap_get(map, &key.ent, NULL);
+	if (!entry) {
 		entry = xcalloc(1, sizeof(struct path_and_oids_entry));
-		hashmap_entry_init(entry, hash);
+		hashmap_entry_init(&entry->ent, hash);
 		entry->path = xstrdup(key.path);
 		oidset_init(&entry->trees, 16);
-		hashmap_put(map, entry);
+		hashmap_put(map, &entry->ent);
 	}
 
 	oidset_insert(&entry->trees, oid);

@@ -83,7 +83,7 @@ static int init_patch_id_entry(struct patch_id *patch,
 	if (commit_patch_id(commit, &ids->diffopts, &header_only_patch_id, 1, 0))
 		return -1;
 
-	hashmap_entry_init(patch, oidhash(&header_only_patch_id));
+	hashmap_entry_init(&patch->ent, oidhash(&header_only_patch_id));
 	return 0;
 }
 
@@ -99,7 +99,7 @@ struct patch_id *has_commit_patch_id(struct commit *commit,
 	if (init_patch_id_entry(&patch, commit, ids))
 		return NULL;
 
-	return hashmap_get(&ids->patches, &patch, NULL);
+	return hashmap_get(&ids->patches, &patch.ent, NULL);
 }
 
 struct patch_id *add_commit_patch_id(struct commit *commit,
@@ -116,6 +116,6 @@ struct patch_id *add_commit_patch_id(struct commit *commit,
 		return NULL;
 	}
 
-	hashmap_add(&ids->patches, key);
+	hashmap_add(&ids->patches, &key->ent);
 	return key;
 }

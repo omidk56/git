@@ -123,8 +123,8 @@ static void add_to_known_names(const char *path,
 		if (!e) {
 			e = xmalloc(sizeof(struct commit_name));
 			oidcpy(&e->peeled, peeled);
-			hashmap_entry_init(e, oidhash(peeled));
-			hashmap_add(&names, e);
+			hashmap_entry_init(&e->entry, oidhash(peeled));
+			hashmap_add(&names, &e->entry);
 			e->path = NULL;
 		}
 		e->tag = tag;

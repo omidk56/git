@@ -20,9 +20,9 @@ struct subprocess_entry *subprocess_find_entry(struct hashmap *hashmap, const ch
 {
 	struct subprocess_entry key;
 
-	hashmap_entry_init(&key, strhash(cmd));
+	hashmap_entry_init(&key.ent, strhash(cmd));
 	key.cmd = cmd;
-	return hashmap_get(hashmap, &key, NULL);
+	return hashmap_get(hashmap, &key.ent, NULL);
 }
 
 int subprocess_read_status(int fd, struct strbuf *status)
@@ -58,7 +58,7 @@ void subprocess_stop(struct hashmap *hashmap, struct subprocess_entry *entry)
 	kill(entry->process.pid, SIGTERM);
 	finish_command(&entry->process);
 
-	hashmap_remove(hashmap, entry, NULL);
+	hashmap_remove(hashmap, &entry->ent, NULL);
 }
 
 static void subprocess_exit_handler(struct child_process *process)
@@ -96,7 +96,7 @@ int subprocess_start(struct hashmap *hashmap, struct subprocess_entry *entry, co
 		return err;
 	}
 
-	hashmap_entry_init(entry, strhash(cmd));
+	hashmap_entry_init(&entry->ent, strhash(cmd));
 
 	err = startfn(entry);
 	if (err) {
@@ -105,7 +105,7 @@ int subprocess_start(struct hashmap *hashmap, struct subprocess_entry *entry, co
 		return err;
 	}
 
-	hashmap_add(hashmap, entry);
+	hashmap_add(hashmap, &entry->ent);
 	return 0;
 }
 
