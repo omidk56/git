@@ -260,6 +260,34 @@ test_expect_success 'fetch what is specified on CLI even if already promised' '
 	! grep "?$(cat blob)" missing_after
 '
 
+test_expect_success 'setup src repo for sparse filter' '
+	git init sparse-src &&
+	git -C sparse-src config --local uploadpack.allowfilter 1 &&
+	git -C sparse-src config --local uploadpack.allowanysha1inwant 1 &&
+	for n in 1 2 3 4
+	do
+		test_commit -C sparse-src "this-is-file-$n" file.$n.txt || return 1
+	done &&
+	test_write_lines /file1.txt /file3.txt >sparse-src/odd-files &&
+	test_write_lines /file2.txt /file4.txt >sparse-src/even-files &&
+	echo "/*" >sparse-src/all-files &&
+	git -C sparse-src add odd-files even-files all-files &&
+	git -C sparse-src commit -m "some sparse checkout files"
+'
+
+test_expect_success 'partial clone with sparse filter succeeds' '
+	git clone --no-local --no-checkout --filter=sparse:oid=master:all-files sparse-src pc-all &&
+	git clone --no-local --no-checkout --filter=sparse:oid=master:even-files sparse-src pc-even &&
+	git clone --no-local --no-checkout --filter=sparse:oid=master:odd-files sparse-src pc-odd
+'
+
+test_expect_success 'partial clone with unresolvable sparse filter fails cleanly' '
+	test_must_fail git clone --no-local --no-checkout --filter=sparse:oid=master:sparse-filter sparse-src sc1 2>err &&
+	test_i18ngrep "unable to read sparse filter specification from sparse:oid=master:sparse-filter" err &&
+	test_must_fail git clone --no-local --no-checkout --filter=sparse:oid=master sparse-src sc2 2>err &&
+	test_i18ngrep "unable to parse sparse filter data in $(git -C sparse-src rev-parse master)" err
+'
+
 . "$TEST_DIRECTORY"/lib-httpd.sh
 start_httpd
 

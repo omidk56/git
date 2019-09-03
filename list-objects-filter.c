@@ -482,9 +482,14 @@ static void filter_sparse_oid__init(
 	struct filter *filter)
 {
 	struct filter_sparse_data *d = xcalloc(1, sizeof(*d));
+
+	if (!filter_options->sparse_oid_value)
+		die(_("unable to read sparse filter specification from %s"),
+		    list_objects_filter_spec(filter_options));
 	if (add_excludes_from_blob_to_list(filter_options->sparse_oid_value,
 					   NULL, 0, &d->el) < 0)
-		die("could not load filter specification");
+		die(_("unable to parse sparse filter data in %s"),
+		      oid_to_hex(filter_options->sparse_oid_value));
 
 	ALLOC_GROW(d->array_frame, d->nr + 1, d->alloc);
 	d->array_frame[d->nr].defval = 0; /* default to include */
