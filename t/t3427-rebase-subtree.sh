@@ -7,8 +7,14 @@ This test runs git rebase and tests the subtree strategy.
 . ./test-lib.sh
 . "$TEST_DIRECTORY"/lib-rebase.sh
 
-commit_message() {
+commit_message () {
 	git log --pretty=format:%s -1 "$1"
+}
+
+extract_files_subtree () {
+	git fast-export --no-data HEAD -- files_subtree/ |
+		sed -e "s%\([0-9a-f]\{40\} \)files_subtree/%\1%" |
+		git fast-import --force --quiet
 }
 
 # There are a few bugs in the rebase with regards to the subtree strategy, and
@@ -59,7 +65,7 @@ test_expect_success 'setup' '
 	test_commit files_subtree/master5 &&
 
 	git checkout -b to-rebase &&
-	git filter-branch --prune-empty -f --subdirectory-filter files_subtree &&
+	extract_files_subtree &&
 	git commit -m "Empty commit" --allow-empty
 '
 
